@@ -3,7 +3,8 @@ from typing import Tuple
 import click
 import numpy as np
 
-from vpype import LineCollection, Length, generator
+from vpype import LengthType, LineCollection, generator
+
 from .cli import cli
 
 
@@ -13,7 +14,7 @@ from .cli import cli
     "-a",
     "--area",
     nargs=2,
-    type=Length(),
+    type=LengthType(),
     default=("10mm", "10mm"),
     help="Dimension of the area in which lines are distributed.",
 )

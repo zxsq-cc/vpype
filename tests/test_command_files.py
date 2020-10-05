@@ -2,8 +2,8 @@ import io
 
 import pytest
 
+from vpype_cli.cli import cli, extract_arguments
 from vpype_cli.debug import DebugData
-from vpype_cli.cli import extract_arguments, cli
 
 
 @pytest.mark.parametrize(
@@ -26,7 +26,9 @@ def test_extract_arguments(input_text, expected):
 
 
 def test_include(runner, root_directory):
-    result = runner.invoke(cli, f"-I {root_directory}/tests/data/include.vpy dbsample dbdump")
+    result = runner.invoke(
+        cli, f"-I '{root_directory}/tests/data/include.vpy' dbsample dbdump"
+    )
     data = DebugData.load(result.output)[0]
 
     # expecting 4x 100 random lines

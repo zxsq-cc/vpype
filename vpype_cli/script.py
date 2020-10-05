@@ -3,6 +3,7 @@ import importlib.util
 import click
 
 from vpype import LineCollection, generator
+
 from .cli import cli
 
 
@@ -27,8 +28,8 @@ def script(file) -> LineCollection:
     try:
         spec = importlib.util.spec_from_file_location("<external>", file)
         module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        return LineCollection(module.generate())
+        spec.loader.exec_module(module)  # type: ignore
+        return LineCollection(module.generate())  # type: ignore
     except Exception as exc:
         raise click.ClickException(
             (

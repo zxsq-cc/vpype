@@ -1,15 +1,17 @@
 import logging
 import os
+import random
 import shlex
-from typing import TextIO, List, Union
+from typing import Any, List, TextIO, Union
 
 import click
+import numpy as np
 from click import get_os_args
 from click_plugins import with_plugins
 from pkg_resources import iter_entry_points
 from shapely.geometry import MultiLineString
 
-from vpype import VpypeState
+from vpype import CONFIG_MANAGER, VpypeState
 
 
 class GroupedGroup(click.Group):
@@ -54,7 +56,9 @@ class GroupedGroup(click.Group):
             for subcommand, cmd in commands:
                 help_text = cmd.get_short_help_str(limit)
                 subcommand += " " * (longest - len(subcommand))
-                groups.setdefault(getattr(cmd, "help_group", "Unknown"), []).append((subcommand, help_text))
+                groups.setdefault(getattr(cmd, "help_group", "Unknown"), []).append(
+                    (subcommand, help_text)
+                )
 
             with formatter.section("Commands"):
                 for group_name, rows in groups.items():
@@ -79,7 +83,13 @@ class GroupedGroup(click.Group):
     is_flag=True,
     help="Record this command in a `vpype_history.txt` in the current directory.",
 )
-def cli(verbose, include, history):
+@click.option("-s", "--seed", type=int, help="Specify the RNG seed.")
+@click.option(
+    "-c", "--config", type=click.Path(exists=True), help="Load an additional config file."
+)
+@click.pass_context
+def cli(ctx, verbose, include, history, seed, config):
+    """Execute the vector processing pipeline passed as argument."""
     logging.basicConfig()
     if verbose == 0:
         logging.getLogger().setLevel(logging.WARNING)
@@ -88,14 +98,29 @@ def cli(verbose, include, history):
     elif verbose > 1:
         logging.getLogger().setLevel(logging.DEBUG)
 
+    # We use the command string as context object, mainly for the purpose of the `write`
+    # command. This is a bit of a hack, and will need to be updated if we ever need more state
+    # to be passed around (probably VpypeState should go in there!)
+    cmd_string = "vpype " + " ".join(shlex.quote(arg) for arg in get_os_args()) + "\n"
+    ctx.obj = cmd_string
+
     if history:
         with open("vpype_history.txt", "a") as fp:
-            fp.write("vpype " + " ".join(shlex.quote(arg) for arg in get_os_args()) + "\n")
+            fp.write(cmd_string)
+
+    if seed is None:
+        seed = np.random.randint(2 ** 31)
+        logging.info(f"vpype: no seed provided, using {seed}")
+    np.random.seed(seed)
+    random.seed(seed)
+
+    if config is not None:
+        CONFIG_MANAGER.load_config_file(config)
 
 
 # noinspection PyShadowingNames,PyUnusedLocal
 @cli.resultcallback()
-def process_pipeline(processors, verbose, include, history):
+def process_pipeline(processors, verbose, include, history, seed, config):
     execute_processors(processors)
 
 
@@ -108,8 +133,8 @@ def execute_processors(processors) -> VpypeState:
     :return: generated geometries
     """
 
-    outer_processors = list()  # gather commands outside of top-level blocks
-    top_level_processors = list()  # gather commands inside of top-level blocks
+    outer_processors: List[Any] = []  # gather commands outside of top-level blocks
+    top_level_processors: List[Any] = []  # gather commands inside of top-level blocks
     block = None  # save the current top-level block's block layer_processor
     nested_count = 0  # block depth counter
     expect_block = False  # set to True by `begin` command
@@ -145,7 +170,7 @@ def execute_processors(processors) -> VpypeState:
 
             if nested_count == 0:
                 # we're closing a top level block, let's process it
-                block_vector_data = block.process(top_level_processors)
+                block_vector_data = block.process(top_level_processors)  # type: ignore
 
                 # Create a placeholder layer_processor that will add the block's result to the
                 # current frame. The placeholder_processor is a closure, so we need to make
@@ -190,10 +215,12 @@ class BeginBlock:
 
 @cli.command(group="Block control")
 def begin():
-    """
-    Mark the start of a block. It must be followed by a block layer_processor command (eg.
-    `grid` or `repeat`), which indicates how the block is processed. Blocks must be ended by a
-    `end` command and can be nested.
+    """Marks the start of a block.
+
+    A `begin` command must be followed by a block processor command (eg. `grid` or `repeat`),
+    which indicates how the block is processed. Blocks must be ended by a `end` command.
+
+    Blocks can be nested.
     """
     return BeginBlock()
 
@@ -204,8 +231,7 @@ class EndBlock:
 
 @cli.command(group="Block control")
 def end():
-    """
-    Mark the end of a block.
+    """Marks the end of a block.
     """
     return EndBlock()
 
@@ -237,11 +263,7 @@ def extract_arguments(f: TextIO) -> List[str]:
     """
     args = []
     for line in f.readlines():
-        idx = line.find("#")
-        if idx != -1:
-            line = line[:idx]
-
-        args.extend(shlex.split(line))
+        args.extend(shlex.split(line, comments=True))
     return args
 
 

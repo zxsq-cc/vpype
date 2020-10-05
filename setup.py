@@ -17,14 +17,17 @@ setup(
     url="https://github.com/abey79/vpype",
     license=license,
     packages=["vpype", "vpype_cli"],
+    include_package_data=True,
     install_requires=[
-        'Click',
+        'attrs',
+        'click>=7.1',
         'click-plugins',
         'matplotlib',
-        'rtree',
+        'scipy',  # scipy is needed to optimize svgpathtools' curve linearization
         'shapely[vectorized]',
         'svgwrite',
         'svgpathtools @ git+https://github.com/abey79/svgpathtools@vpype-fixes',
+        'toml',
     ],
     entry_points='''
         [console_scripts]

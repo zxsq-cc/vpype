@@ -2,8 +2,9 @@ from typing import Tuple
 
 import click
 
-from vpype import block_processor, VectorData, Length
-from .cli import cli, BlockProcessor, execute_processors
+from vpype import LengthType, VectorData, block_processor
+
+from .cli import BlockProcessor, cli, execute_processors
 
 
 @cli.command("grid", group="Block processors")
@@ -13,7 +14,7 @@ from .cli import cli, BlockProcessor, execute_processors
     "--offset",
     nargs=2,
     default=("10mm", "10mm"),
-    type=Length(),
+    type=LengthType(),
     help="Offset between columns and rows. This option understands supported units.",
 )
 @block_processor

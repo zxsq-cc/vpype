@@ -1,11 +1,13 @@
 # base
-click
+attrs
+click>=7.1
 click-plugins
 matplotlib
 numpy
-rtree
+scipy
 shapely[vectorized]
 svgwrite
+toml
 
 git+https://github.com/abey79/svgpathtools@vpype-fixes#egg=svgpathtools
 
@@ -13,3 +15,8 @@ git+https://github.com/abey79/svgpathtools@vpype-fixes#egg=svgpathtools
 # dev/test
 pytest
 black
+isort
+
+
+# documentation
+-r docs/requirements.txt
